@@ -177,19 +177,25 @@ public class SparkMicroBatchStream implements MicroBatchStream, SupportsAdmissio
 
     List<FileScanTask> fileScanTasks = planFiles(startOffset, endOffset);
     FileScanTaskSummary taskSummary = new FileScanTaskSummary(fileScanTasks);
-    LOG.debug(
-        "planFiles returned {} file scan tasks. total_files={}, total_size_in_bytes={}. Time taken to eval stats {} ms",
+    LOG.info(
+        "Spark micro‑batch 'planFiles' generated {} scan tasks ({} files, {} bytes); summary computed in {} ms",
         fileScanTasks.size(),
-        taskSummary.nrOfFiles,
-        taskSummary.sizeInBytes,
-        taskSummary.evalTimeTakenMs);
+        taskSummary.getTotalFiles(),
+        taskSummary.getTotalSizeBytes(),
+        taskSummary.getEvalTimeTakenMs());
 
     CloseableIterable<FileScanTask> splitTasks =
         TableScanUtil.splitFiles(CloseableIterable.withNoopClose(fileScanTasks), splitSize);
     List<CombinedScanTask> combinedScanTasks =
         Lists.newArrayList(
             TableScanUtil.planTasks(splitTasks, splitSize, splitLookback, splitOpenFileCost));
-    LOG.debug("Split into {} combined scan tasks", combinedScanTasks.size());
+
+    LOG.info(
+        "Spark micro‑batch 'split' produced {} combined scan tasks (splitSize={}, splitLookback={}, splitOpenFileCost={})",
+        combinedScanTasks.size(),
+        splitSize,
+        splitLookback,
+        splitOpenFileCost);
 
     String[][] locations = computePreferredLocations(combinedScanTasks);
     InputPartition[] partitions = new InputPartition[combinedScanTasks.size()];
@@ -621,9 +627,9 @@ public class SparkMicroBatchStream implements MicroBatchStream, SupportsAdmissio
   static class FileScanTaskSummary {
     private long sizeInBytes = 0;
     private int nrOfFiles = 0;
-    private long evalTimeTakenMs;
+    private final long evalTimeTakenMs;
 
-    public FileScanTaskSummary(List<FileScanTask> list) {
+    FileScanTaskSummary(List<FileScanTask> list) {
       long currentTimeMillis = System.currentTimeMillis();
       for (var task : list) {
         nrOfFiles += task.filesCount();
