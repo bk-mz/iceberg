@@ -166,6 +166,7 @@ abstract class SparkScan implements Scan, SupportsReportStatistics {
 
   @Override
   public MicroBatchStream toMicroBatchStream(String checkpointLocation) {
+    LOG.info("THIS MICROBATCH OPTIONS:{}", readConf.getOptions());
     return new SparkMicroBatchStream(
         sparkContext, table, readConf, expectedSchema, checkpointLocation);
   }

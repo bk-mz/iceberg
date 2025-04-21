@@ -29,6 +29,7 @@ import org.apache.iceberg.hadoop.Util;
 import org.apache.iceberg.util.PropertyUtil;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 /**
  * A class for common Iceberg configs for Spark reads.
@@ -57,6 +58,11 @@ public class SparkReadConf {
   private final SparkSession spark;
   private final Table table;
   private final String branch;
+
+  public CaseInsensitiveStringMap getOptions() {
+    return confParser.getOptions();
+  }
+
   private final SparkConfParser confParser;
 
   public SparkReadConf(SparkSession spark, Table table, Map<String, String> readOptions) {

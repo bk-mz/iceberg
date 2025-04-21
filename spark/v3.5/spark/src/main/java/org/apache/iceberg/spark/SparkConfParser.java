@@ -36,6 +36,11 @@ class SparkConfParser {
 
   private final Map<String, String> properties;
   private final RuntimeConfig sessionConf;
+
+  public CaseInsensitiveStringMap getOptions() {
+    return options;
+  }
+
   private final CaseInsensitiveStringMap options;
 
   SparkConfParser() {
