@@ -66,7 +66,7 @@ public class SerializableTableWithSize extends SerializableTable
   public void close() throws Exception {
     if (serializationMarker == null) {
       LOG.info("Releasing resources");
-      io().close();
+      //io().close();
     }
     invalidateCache(name());
   }
@@ -93,7 +93,7 @@ public class SerializableTableWithSize extends SerializableTable
     public void close() throws Exception {
       if (serializationMarker == null) {
         LOG.info("Releasing resources");
-        io().close();
+        //io().close();
       }
       invalidateCache(name());
     }
