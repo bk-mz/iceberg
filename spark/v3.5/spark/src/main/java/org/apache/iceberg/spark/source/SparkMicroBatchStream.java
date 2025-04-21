@@ -30,6 +30,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import org.apache.iceberg.CombinedScanTask;
 import org.apache.iceberg.DataOperations;
 import org.apache.iceberg.FileScanTask;
@@ -89,7 +90,7 @@ public class SparkMicroBatchStream implements MicroBatchStream, SupportsAdmissio
   private final int maxFilesPerMicroBatch;
   private final int maxRecordsPerMicroBatch;
 
-  public SparkMicroBatchStream(
+  SparkMicroBatchStream(
       JavaSparkContext sparkContext,
       Table table,
       SparkReadConf readConf,
@@ -134,26 +135,26 @@ public class SparkMicroBatchStream implements MicroBatchStream, SupportsAdmissio
   @Override
   public Offset latestOffset() {
     table.refresh();
+    Snapshot currentSnapshot = table.currentSnapshot();
     LOG.debug(
-        "Refreshed table {}, current snapshot id={}",
+        "Refreshed table (name={}, uuid={}), current snapshot id={}",
         table.name(),
-        table.currentSnapshot() != null ? table.currentSnapshot().snapshotId() : "null");
+        table.uuid(),
+        currentSnapshot != null ? currentSnapshot.snapshotId() : "null");
 
-    if (table.currentSnapshot() == null
-        || table.currentSnapshot().timestampMillis() < fromTimestamp) {
+    if (currentSnapshot == null || currentSnapshot.timestampMillis() < fromTimestamp) {
       LOG.debug(
           "No valid current snapshot or snapshot before fromTimestamp ({}), returning START_OFFSET",
           fromTimestamp);
       return StreamingOffset.START_OFFSET;
     }
 
-    Snapshot latestSnapshot = table.currentSnapshot();
-    long added = addedFilesCount(latestSnapshot);
-    StreamingOffset offset = new StreamingOffset(latestSnapshot.snapshotId(), added, false);
+    long added = addedFilesCount(currentSnapshot);
+    StreamingOffset offset = new StreamingOffset(currentSnapshot.snapshotId(), added, false);
 
     LOG.debug(
         "Computed latestOffset: snapshotId={}, addedFilesCount={}",
-        latestSnapshot.snapshotId(),
+        currentSnapshot.snapshotId(),
         added);
     return offset;
   }
@@ -177,7 +178,7 @@ public class SparkMicroBatchStream implements MicroBatchStream, SupportsAdmissio
 
     List<FileScanTask> fileScanTasks = planFiles(startOffset, endOffset);
     FileScanTaskSummary taskSummary = new FileScanTaskSummary(fileScanTasks);
-    LOG.info(
+    LOG.debug(
         "Spark micro‑batch 'planFiles' generated {} scan tasks ({} files, {} bytes); summary computed in {} ms",
         fileScanTasks.size(),
         taskSummary.getTotalFiles(),
@@ -625,28 +626,47 @@ public class SparkMicroBatchStream implements MicroBatchStream, SupportsAdmissio
   }
 
   static class FileScanTaskSummary {
-    private long sizeInBytes = 0;
-    private int nrOfFiles = 0;
-    private final long evalTimeTakenMs;
+    private final List<FileScanTask> tasks;
 
-    FileScanTaskSummary(List<FileScanTask> list) {
-      long currentTimeMillis = System.currentTimeMillis();
-      for (var task : list) {
-        nrOfFiles += task.filesCount();
-        sizeInBytes += task.sizeBytes();
+    // Cached results
+    private boolean initialized = false;
+    private long sizeInBytes;
+    private int nrOfFiles;
+    private long evalTimeTakenMs;
+
+    public FileScanTaskSummary(List<FileScanTask> tasks) {
+      this.tasks = Objects.requireNonNull(tasks);
+    }
+
+    private void init() {
+      if (initialized) return;
+      long start = System.currentTimeMillis();
+
+      int files = 0;
+      long bytes = 0;
+      for (FileScanTask task : tasks) {
+        files += task.filesCount();
+        bytes += task.sizeBytes();
       }
-      this.evalTimeTakenMs = System.currentTimeMillis() - currentTimeMillis;
+
+      this.nrOfFiles = files;
+      this.sizeInBytes = bytes;
+      this.evalTimeTakenMs = System.currentTimeMillis() - start;
+      this.initialized = true;
     }
 
     public long getTotalSizeBytes() {
+      init();
       return sizeInBytes;
     }
 
     public int getTotalFiles() {
+      init();
       return nrOfFiles;
     }
 
     public long getEvalTimeTakenMs() {
+      init();
       return evalTimeTakenMs;
     }
   }
