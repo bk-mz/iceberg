@@ -634,12 +634,14 @@ public class SparkMicroBatchStream implements MicroBatchStream, SupportsAdmissio
     private int nrOfFiles;
     private long evalTimeTakenMs;
 
-    public FileScanTaskSummary(List<FileScanTask> tasks) {
-      this.tasks = Objects.requireNonNull(tasks);
+    FileScanTaskSummary(List<FileScanTask> tasks) {
+      this.tasks = Preconditions.checkNotNull(tasks);
     }
 
     private void init() {
-      if (initialized) return;
+      if (initialized) {
+          return;
+      }
       long start = System.currentTimeMillis();
 
       int files = 0;
